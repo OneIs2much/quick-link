@@ -1,20 +1,53 @@
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LinkProvider } from './src/contexts/LinkContext';
+import { SettingsProvider, useSettings } from './src/contexts/SettingsContext';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { AddEditLinkScreen } from './src/screens/AddEditLinkScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
+import { TutorialScreen } from './src/screens/TutorialScreen';
+import { RootStackParamList } from './src/types';
 
-export default function App() {
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function AppNavigator() {
+  const { settings, loading } = useSettings();
+
+  if (loading) {
+    return null;
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+      }}
+    >
+      {!settings.tutorialCompleted && (
+        <Stack.Screen name="Tutorial" component={TutorialScreen} />
+      )}
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="AddEditLink" component={AddEditLinkScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+    </Stack.Navigator>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <SettingsProvider>
+        <LinkProvider>
+          <NavigationContainer>
+            <StatusBar style="dark" />
+            <AppNavigator />
+          </NavigationContainer>
+        </LinkProvider>
+      </SettingsProvider>
+    </SafeAreaProvider>
+  );
+}

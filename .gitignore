@@ -2,6 +2,12 @@
 
 # dependencies
 node_modules/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # Expo
 .expo/
@@ -25,17 +31,74 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.*
 
 # macOS
 .DS_Store
 *.pem
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+*~
 
 # local env files
+.env
+.env.*
+!.env.example
 .env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
 
 # typescript
 *.tsbuildinfo
+*.tsbuildinfo.*
+
+# Expo EAS
+*.tar.gz
+
+# testing
+coverage/
+.nyc_output/
 
 # generated native folders
 /ios
 /android
+
+# android specific
+android/app/build/
+android/.gradle/
+android/build/
+android/captures/
+android/local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ios specific
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/*.xcodeproj/xcuserdata
+ios/*.xcodeproj/project.xcworkspace
+
+# temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
