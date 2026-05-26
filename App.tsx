@@ -47,8 +47,14 @@ function AppNavigator() {
 
   if (loading) return null;
 
+  const handleNavigatorReady = () => {
+    if (!settings.tutorialCompleted) {
+      navigationRef.current?.navigate('Tutorial' as any);
+    }
+  };
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} onReady={handleNavigatorReady}>
       <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
       <Stack.Navigator
         screenOptions={{
@@ -56,12 +62,10 @@ function AppNavigator() {
           animation: 'slide_from_right',
         }}
       >
-        {!settings.tutorialCompleted && (
-          <Stack.Screen name="Tutorial" component={TutorialScreen} />
-        )}
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="AddEditLink" component={AddEditLinkScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Tutorial" component={TutorialScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

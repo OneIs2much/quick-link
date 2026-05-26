@@ -233,13 +233,6 @@ export function SettingsScreen({ navigation }: Props) {
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={s.optionRow} onPress={handleResetTutorial}>
-            <View style={s.optionLeft}>
-              <Ionicons name="refresh-outline" size={22} color={colors.warning} />
-              <Text style={s.optionLabel}>重置使用教程</Text>
-            </View>
-          </TouchableOpacity>
-
           <View style={s.optionDivider} />
 
           <TouchableOpacity style={s.optionRow} onPress={handleClearData}>
