@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
+import { SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface HeaderProps {
   title: string;
@@ -14,20 +15,23 @@ interface HeaderProps {
 }
 
 export function Header({ title, showBack, onBack, rightAction }: HeaderProps) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <View style={styles.left}>
         {showBack && (
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
         )}
       </View>
-      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
+        {title}
+      </Text>
       <View style={styles.right}>
         {rightAction && (
           <TouchableOpacity onPress={rightAction.onPress} style={styles.actionButton}>
-            <Ionicons name={rightAction.icon} size={24} color={COLORS.primary} />
+            <Ionicons name={rightAction.icon} size={24} color={colors.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -43,30 +47,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.xl,
     paddingBottom: SPACING.md,
-    backgroundColor: COLORS.surface,
     ...SHADOWS.sm,
   },
-  left: {
-    width: 44,
-    alignItems: 'flex-start',
-  },
-  right: {
-    width: 44,
-    alignItems: 'flex-end',
-  },
-  backButton: {
-    padding: SPACING.xs,
-    marginLeft: -SPACING.xs,
-  },
-  actionButton: {
-    padding: SPACING.xs,
-    marginRight: -SPACING.xs,
-  },
+  left: { width: 44, alignItems: 'flex-start' },
+  right: { width: 44, alignItems: 'flex-end' },
+  backButton: { padding: SPACING.xs, marginLeft: -SPACING.xs },
+  actionButton: { padding: SPACING.xs, marginRight: -SPACING.xs },
   title: {
     flex: 1,
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.textPrimary,
     textAlign: 'center',
   },
 });

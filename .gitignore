@@ -78,6 +78,10 @@ coverage/
 /ios
 /android
 
+# local module build artifacts
+modules/**/build/
+modules/**/.cxx/
+
 # android specific
 android/app/build/
 android/.gradle/

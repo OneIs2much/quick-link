@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,36 +6,64 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Alert,
+  ScrollView,
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
+import { SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { useLinks } from '../contexts/LinkContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useHaptics } from '../hooks/useHaptics';
+import { useToast } from '../hooks/useToast';
 import { LinkCard } from '../components/LinkCard';
 import { EmptyState } from '../components/EmptyState';
 import { PasswordDialog } from '../components/PasswordDialog';
 import { openLinkInBrowser } from '../services/browserService';
+import { addLinkToHomeScreen, canAddToHomeScreen } from '../services/shortcutService';
 import { QuickLink } from '../types';
-import { useHaptics } from '../utils/haptics';
 
 interface Props {
   navigation: any;
+  route: any;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_SPACING = SCREEN_WIDTH * 0.025;
 const CARD_WIDTH = (SCREEN_WIDTH - SPACING.lg * 2 - GRID_SPACING * 2) / 3;
 
-export function HomeScreen({ navigation }: Props) {
-  const { links, loading, deleteLink, verifyPassword } = useLinks();
+const ALL_CATEGORY = '__all__';
+
+export function HomeScreen({ navigation, route }: Props) {
+  const { links, loading, deleteLink, verifyPassword, getCategories } = useLinks();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { medium } = useHaptics();
+  const toast = useToast();
 
   const [refreshing, setRefreshing] = useState(false);
   const [passwordDialog, setPasswordDialog] = useState<QuickLink | null>(null);
   const [menuVisible, setMenuVisible] = useState<QuickLink | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY);
+
+  // 处理来自 deep link 的 openLinkId（桌面快捷方式点击）
+  useEffect(() => {
+    const openLinkId = route.params?.openLinkId as string | undefined;
+    if (!openLinkId) return;
+    const link = links.find(l => l.id === openLinkId);
+    if (!link) return;
+    // 清除参数，防止重复触发
+    navigation.setParams({ openLinkId: undefined });
+    handleLinkPress(link);
+  }, [route.params?.openLinkId, links]);
+
+  const categories = getCategories();
+  const hasCategories = categories.length > 0;
+
+  const filteredLinks =
+    selectedCategory === ALL_CATEGORY
+      ? links
+      : links.filter(l => l.category === selectedCategory);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -62,41 +90,42 @@ export function HomeScreen({ navigation }: Props) {
       setPasswordDialog(null);
       openLinkInBrowser(passwordDialog.url, passwordDialog.browserPackage);
     } else {
-      Alert.alert('密码错误', '请输入正确的访问密码');
+      toast.error('密码错误，请重新输入');
     }
   };
 
   const handleDeleteLink = () => {
     if (!menuVisible) return;
-    Alert.alert(
+    toast.confirm(
       '删除链接',
       `确定要删除 "${menuVisible.name}" 吗？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteLink(menuVisible.id);
-            setMenuVisible(null);
-          },
-        },
-      ]
+      async () => {
+        await deleteLink(menuVisible.id);
+        setMenuVisible(null);
+      },
+      '删除',
+      true,
     );
   };
 
-  const handlePinToHome = () => {
+  const handleAddToHomeScreen = async () => {
     if (!menuVisible) return;
-    Alert.alert(
-      '添加到桌面',
-      '请长按应用图标，在弹出菜单中选择"添加到主屏幕"。\n\n你也可以在系统设置中将此应用的桌面小组件添加到主屏幕。',
-      [{ text: '知道了' }]
-    );
     setMenuVisible(null);
+
+    const result = await addLinkToHomeScreen(menuVisible.id, menuVisible.name);
+    if (result === 'success') {
+      toast.success('已发起添加请求，请在系统对话框中确认');
+    } else if (result === 'unsupported') {
+      toast.error('当前设备不支持添加到桌面（需要 Android 8.0+）');
+    } else {
+      toast.error('添加到桌面失败，请重试');
+    }
   };
+
+  const s = makeStyles(colors);
 
   const renderLinkItem = ({ item }: { item: QuickLink }) => (
-    <View style={[styles.cardWrapper, { width: CARD_WIDTH }]}>
+    <View style={[s.cardWrapper, { width: CARD_WIDTH }]}>
       <LinkCard
         link={item}
         onPress={handleLinkPress}
@@ -105,64 +134,103 @@ export function HomeScreen({ navigation }: Props) {
     </View>
   );
 
+  const renderHeader = () => (
+    <View style={[s.header, { paddingTop: insets.top + SPACING.md }]}>
+      <Text style={s.headerTitle}>Quick Link</Text>
+      <View style={s.headerActions}>
+        <TouchableOpacity
+          style={s.headerButton}
+          onPress={() => navigation.navigate('Tutorial')}
+        >
+          <Ionicons name="help-circle-outline" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.headerButton}
+          onPress={() => navigation.navigate('Settings')}
+        >
+          <Ionicons name="settings-outline" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   if (!loading && links.length === 0) {
     return (
-      <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
-          <Text style={styles.headerTitle}>Quick Link</Text>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Ionicons name="settings-outline" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-        </View>
+      <View style={s.container}>
+        {renderHeader()}
         <EmptyState
           icon="add-circle-outline"
           title="还没有链接"
-          description="点击下方按钮创建你的第一个快捷链接，它可以添加到手机桌面哦"
+          description="点击下方按钮创建你的第一个快捷链接，长按链接可添加到手机桌面"
         />
         <TouchableOpacity
-          style={[styles.fab, { bottom: insets.bottom + SPACING.xl }]}
+          style={[s.fab, { bottom: insets.bottom + SPACING.xl }]}
           onPress={() => navigation.navigate('AddEditLink', {})}
         >
-          <Ionicons name="add" size={28} color={COLORS.textInverse} />
+          <Ionicons name="add" size={28} color={colors.textInverse} />
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
-        <Text style={styles.headerTitle}>Quick Link</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('Tutorial')}
-          >
-            <Ionicons name="help-circle-outline" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Ionicons name="settings-outline" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View style={s.container}>
+      {renderHeader()}
 
-      <View style={styles.summaryBar}>
-        <Text style={styles.summaryText}>{links.length} 个快捷链接</Text>
+      {/* 分类筛选 Tab */}
+      {hasCategories && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.categoryBar}
+          contentContainerStyle={s.categoryBarContent}
+        >
+          <TouchableOpacity
+            style={[s.categoryChip, selectedCategory === ALL_CATEGORY && s.categoryChipActive]}
+            onPress={() => setSelectedCategory(ALL_CATEGORY)}
+          >
+            <Text
+              style={[
+                s.categoryChipText,
+                selectedCategory === ALL_CATEGORY && s.categoryChipTextActive,
+              ]}
+            >
+              全部
+            </Text>
+          </TouchableOpacity>
+          {categories.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              style={[s.categoryChip, selectedCategory === cat && s.categoryChipActive]}
+              onPress={() => setSelectedCategory(cat)}
+            >
+              <Text
+                style={[
+                  s.categoryChipText,
+                  selectedCategory === cat && s.categoryChipTextActive,
+                ]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      <View style={s.summaryBar}>
+        <Text style={s.summaryText}>
+          {filteredLinks.length} 个快捷链接
+          {selectedCategory !== ALL_CATEGORY ? ` · ${selectedCategory}` : ''}
+        </Text>
       </View>
 
       <FlatList
-        data={links}
+        data={filteredLinks}
         renderItem={renderLinkItem}
         keyExtractor={item => item.id}
         numColumns={3}
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={s.listContent}
+        columnWrapperStyle={s.columnWrapper}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -170,39 +238,46 @@ export function HomeScreen({ navigation }: Props) {
       />
 
       <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + SPACING.xl }]}
+        style={[s.fab, { bottom: insets.bottom + SPACING.xl }]}
         onPress={() => navigation.navigate('AddEditLink', {})}
       >
-        <Ionicons name="add" size={28} color={COLORS.textInverse} />
+        <Ionicons name="add" size={28} color={colors.textInverse} />
       </TouchableOpacity>
 
+      {/* 长按菜单 */}
       {menuVisible && (
         <TouchableOpacity
-          style={styles.menuOverlay}
+          style={s.menuOverlay}
           activeOpacity={1}
           onPress={() => setMenuVisible(null)}
         >
-          <View style={styles.menuContainer}>
-            <Text style={styles.menuTitle} numberOfLines={1}>{menuVisible.name}</Text>
+          <View style={s.menuContainer}>
+            <Text style={s.menuTitle} numberOfLines={1}>{menuVisible.name}</Text>
+
             <TouchableOpacity
-              style={styles.menuItem}
+              style={s.menuItem}
               onPress={() => {
                 const link = menuVisible;
                 setMenuVisible(null);
                 navigation.navigate('AddEditLink', { linkId: link.id });
               }}
             >
-              <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.menuItemText}>编辑</Text>
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
+              <Text style={s.menuItemText}>编辑</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={handlePinToHome}>
-              <Ionicons name="push-outline" size={20} color={COLORS.secondary} />
-              <Text style={styles.menuItemText}>添加到桌面</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleDeleteLink}>
-              <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-              <Text style={[styles.menuItemText, { color: COLORS.error }]}>删除</Text>
+
+            {canAddToHomeScreen() && (
+              <TouchableOpacity style={s.menuItem} onPress={handleAddToHomeScreen}>
+                <Ionicons name="phone-portrait-outline" size={20} color={colors.secondary} />
+                <Text style={s.menuItemText}>添加到桌面</Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={s.menuDivider} />
+
+            <TouchableOpacity style={s.menuItem} onPress={handleDeleteLink}>
+              <Ionicons name="trash-outline" size={20} color={colors.error} />
+              <Text style={[s.menuItemText, { color: colors.error }]}>删除</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -218,99 +293,103 @@ export function HomeScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.md,
-    backgroundColor: COLORS.surface,
-    ...SHADOWS.sm,
-  },
-  headerTitle: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    letterSpacing: -0.5,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  headerButton: {
-    padding: SPACING.xs,
-  },
-  summaryBar: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  summaryText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textTertiary,
-    fontWeight: '500',
-  },
-  listContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 100,
-  },
-  columnWrapper: {
-    gap: GRID_SPACING,
-    justifyContent: 'flex-start',
-  },
-  cardWrapper: {
-    marginBottom: SPACING.sm,
-  },
-  fab: {
-    position: 'absolute',
-    right: SPACING.xl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.lg,
-  },
-  menuOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  menuContainer: {
-    width: '75%',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
-    ...SHADOWS.lg,
-  },
-  menuTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-  },
-  menuItemText: {
-    fontSize: FONT_SIZE.lg,
-    color: COLORS.textPrimary,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: COLORS.divider,
-    marginVertical: SPACING.xs,
-  },
-});
+function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING.lg,
+      paddingBottom: SPACING.md,
+      backgroundColor: colors.surface,
+      ...SHADOWS.sm,
+    },
+    headerTitle: {
+      fontSize: FONT_SIZE.xxl,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+    },
+    headerActions: { flexDirection: 'row', gap: SPACING.xs },
+    headerButton: { padding: SPACING.xs },
+    categoryBar: { maxHeight: 48 },
+    categoryBarContent: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      gap: SPACING.sm,
+    },
+    categoryChip: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: BORDER_RADIUS.full,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    categoryChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    categoryChipText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    categoryChipTextActive: { color: colors.primary },
+    summaryBar: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
+    summaryText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.textTertiary,
+      fontWeight: '500',
+    },
+    listContent: { paddingHorizontal: SPACING.lg, paddingBottom: 100 },
+    columnWrapper: { gap: GRID_SPACING, justifyContent: 'flex-start' },
+    cardWrapper: { marginBottom: SPACING.sm },
+    fab: {
+      position: 'absolute',
+      right: SPACING.xl,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...SHADOWS.lg,
+    },
+    menuOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 100,
+    },
+    menuContainer: {
+      width: '75%',
+      backgroundColor: colors.surface,
+      borderRadius: BORDER_RADIUS.xl,
+      padding: SPACING.xl,
+      ...SHADOWS.lg,
+    },
+    menuTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: SPACING.lg,
+      textAlign: 'center',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.sm,
+    },
+    menuItemText: { fontSize: FONT_SIZE.lg, color: colors.textPrimary },
+    menuDivider: {
+      height: 1,
+      backgroundColor: colors.divider,
+      marginVertical: SPACING.xs,
+    },
+  });
+}

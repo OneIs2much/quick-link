@@ -1,12 +1,10 @@
 import React from 'react';
-import {
-  View,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING, SHADOWS } from '../constants/theme';
+import { SPACING } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { useLinks } from '../contexts/LinkContext';
+import { useToast } from '../hooks/useToast';
 import { LinkForm } from '../components/LinkForm';
 import { Header } from '../components/Header';
 import { QuickLink } from '../types';
@@ -17,35 +15,31 @@ interface Props {
 }
 
 export function AddEditLinkScreen({ navigation, route }: Props) {
-  const { links, addLink, updateLink, getLinkById } = useLinks();
+  const { addLink, updateLink, getLinkById } = useLinks();
+  const { colors } = useTheme();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
+
   const linkId = route.params?.linkId as string | undefined;
   const existingLink = linkId ? getLinkById(linkId) : undefined;
   const isEditing = !!existingLink;
-  const insets = useSafeAreaInsets();
 
   const handleSubmit = async (data: Omit<QuickLink, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       if (isEditing && existingLink) {
-        await updateLink({
-          ...existingLink,
-          ...data,
-        });
-        Alert.alert('成功', '链接已更新', [
-          { text: '确定', onPress: () => navigation.goBack() },
-        ]);
+        await updateLink({ ...existingLink, ...data });
+        toast.success('链接已更新', () => navigation.goBack());
       } else {
         await addLink(data);
-        Alert.alert('成功', '链接已创建，长按链接可添加到桌面', [
-          { text: '确定', onPress: () => navigation.goBack() },
-        ]);
+        toast.success('链接已创建，长按链接可添加到桌面', () => navigation.goBack());
       }
-    } catch (e) {
-      Alert.alert('错误', '操作失败，请重试');
+    } catch {
+      // StorageError 已在 LinkContext 中 toast，此处无需重复提示
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={{ paddingTop: insets.top }}>
         <Header
           title={isEditing ? '编辑链接' : '添加链接'}
@@ -63,8 +57,5 @@ export function AddEditLinkScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1 },
 });

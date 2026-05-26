@@ -10,9 +10,11 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
+import { SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { DEFAULT_ICONS, ICON_OPTIONS } from '../constants/browsers';
 import { BrowserPicker } from './BrowserPicker';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLinks } from '../contexts/LinkContext';
 import { QuickLink, BrowserInfo } from '../types';
 
 interface LinkFormProps {
@@ -22,17 +24,24 @@ interface LinkFormProps {
 }
 
 export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps) {
+  const { colors } = useTheme();
+  const { getCategories } = useLinks();
+
   const [name, setName] = useState(initialValues?.name || '');
   const [url, setUrl] = useState(initialValues?.url || '');
   const [icon, setIcon] = useState(initialValues?.icon || DEFAULT_ICONS[0]);
-  const [iconType, setIconType] = useState<'emoji' | 'icon' | 'text'>(initialValues?.iconType || 'emoji');
+  const [iconType, setIconType] = useState<'emoji' | 'icon' | 'text'>(
+    initialValues?.iconType || 'emoji',
+  );
   const [browserPackage, setBrowserPackage] = useState(initialValues?.browserPackage);
   const [browserName, setBrowserName] = useState('');
   const [password, setPassword] = useState(initialValues?.password || '');
+  const [category, setCategory] = useState(initialValues?.category || '');
   const [showBrowserPicker, setShowBrowserPicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
   const [errors, setErrors] = useState<{ name?: string; url?: string }>({});
+
+  const existingCategories = getCategories();
 
   const validate = (): boolean => {
     const newErrors: { name?: string; url?: string } = {};
@@ -51,6 +60,7 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
       iconType,
       browserPackage,
       password: password.trim() || undefined,
+      category: category.trim() || undefined,
     });
   };
 
@@ -65,24 +75,23 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
     }
   };
 
-  const selectedIconTypeConfig = ICON_OPTIONS.find(o => o.type === iconType);
+  const s = makeStyles(colors);
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={s.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>图标</Text>
-          <View style={styles.iconTypeRow}>
+      <ScrollView style={s.container} keyboardShouldPersistTaps="handled">
+
+        {/* 图标选择 */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>图标</Text>
+          <View style={s.iconTypeRow}>
             {ICON_OPTIONS.map(opt => (
               <TouchableOpacity
                 key={opt.type}
-                style={[
-                  styles.iconTypeChip,
-                  iconType === opt.type && styles.iconTypeChipActive,
-                ]}
+                style={[s.iconTypeChip, iconType === opt.type && s.iconTypeChipActive]}
                 onPress={() => {
                   setIconType(opt.type);
                   if (opt.type === 'emoji') setIcon(DEFAULT_ICONS[0]);
@@ -92,8 +101,8 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
               >
                 <Text
                   style={[
-                    styles.iconTypeText,
-                    iconType === opt.type && styles.iconTypeTextActive,
+                    s.iconTypeText,
+                    iconType === opt.type && s.iconTypeTextActive,
                   ]}
                 >
                   {opt.label}
@@ -103,55 +112,53 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
           </View>
 
           {iconType === 'emoji' && (
-            <View style={styles.emojiGrid}>
+            <View style={s.emojiGrid}>
               {DEFAULT_ICONS.map(emoji => (
                 <TouchableOpacity
                   key={emoji}
-                  style={[
-                    styles.emojiItem,
-                    icon === emoji && styles.emojiItemActive,
-                  ]}
+                  style={[s.emojiItem, icon === emoji && s.emojiItemActive]}
                   onPress={() => setIcon(emoji)}
                 >
-                  <Text style={styles.emojiText}>{emoji}</Text>
+                  <Text style={s.emojiText}>{emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
 
           {iconType === 'icon' && (
-            <View style={styles.previewContainer}>
-              <View style={styles.previewIcon}>
+            <View style={s.previewContainer}>
+              <View style={s.previewIcon}>
                 <Ionicons
                   name={(icon as keyof typeof Ionicons.glyphMap) || 'link'}
                   size={32}
-                  color={COLORS.primary}
+                  color={colors.primary}
                 />
               </View>
-              <Text style={styles.previewLabel}>图标: link</Text>
+              <Text style={s.previewLabel}>图标: {icon || 'link'}</Text>
             </View>
           )}
 
           {iconType === 'text' && (
-            <View style={styles.previewContainer}>
-              <View style={[styles.previewIcon, styles.previewIconText]}>
-                <Text style={styles.previewText}>
+            <View style={s.previewContainer}>
+              <View style={[s.previewIcon, s.previewIconText]}>
+                <Text style={s.previewText}>
                   {name ? name.charAt(0).toUpperCase() : 'A'}
                 </Text>
               </View>
-              <Text style={styles.previewLabel}>将取名称首字符作为图标</Text>
+              <Text style={s.previewLabel}>将取名称首字符作为图标</Text>
             </View>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>基本信息</Text>
+        {/* 基本信息 */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>基本信息</Text>
 
-          <Text style={styles.label}>链接名称</Text>
+          <Text style={s.label}>链接名称</Text>
           <TextInput
-            style={[styles.input, errors.name ? styles.inputError : null]}
+            style={[s.input, errors.name ? s.inputError : null]}
             placeholder="例如：我的博客"
-            placeholderTextColor={COLORS.textTertiary}
+            placeholderTextColor={colors.textTertiary}
             value={name}
             onChangeText={text => {
               setName(text);
@@ -159,13 +166,13 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
             }}
             maxLength={20}
           />
-          {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
+          {errors.name ? <Text style={s.errorText}>{errors.name}</Text> : null}
 
-          <Text style={styles.label}>链接地址 (URL)</Text>
+          <Text style={s.label}>链接地址 (URL)</Text>
           <TextInput
-            style={[styles.input, errors.url ? styles.inputError : null]}
+            style={[s.input, errors.url ? s.inputError : null]}
             placeholder="例如：https://example.com"
-            placeholderTextColor={COLORS.textTertiary}
+            placeholderTextColor={colors.textTertiary}
             value={url}
             onChangeText={text => {
               setUrl(text);
@@ -175,56 +182,91 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {errors.url ? <Text style={styles.errorText}>{errors.url}</Text> : null}
+          {errors.url ? <Text style={s.errorText}>{errors.url}</Text> : null}
+
+          <Text style={s.label}>分类（可选）</Text>
+          <TextInput
+            style={s.input}
+            placeholder="例如：工作、娱乐、学习"
+            placeholderTextColor={colors.textTertiary}
+            value={category}
+            onChangeText={setCategory}
+            maxLength={20}
+          />
+          {/* 已有分类快速选择 */}
+          {existingCategories.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={s.categorySuggestions}
+              contentContainerStyle={s.categorySuggestionsContent}
+            >
+              {existingCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[s.categorySuggestion, category === cat && s.categorySuggestionActive]}
+                  onPress={() => setCategory(category === cat ? '' : cat)}
+                >
+                  <Text
+                    style={[
+                      s.categorySuggestionText,
+                      category === cat && s.categorySuggestionTextActive,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>浏览器设置</Text>
+        {/* 浏览器设置 */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>浏览器设置</Text>
           <TouchableOpacity
-            style={styles.optionRow}
+            style={s.optionRow}
             onPress={() => setShowBrowserPicker(true)}
           >
-            <View style={styles.optionLeft}>
-              <Ionicons name="compass" size={22} color={COLORS.primary} />
-              <Text style={styles.optionLabel}>
+            <View style={s.optionLeft}>
+              <Ionicons name="compass" size={22} color={colors.primary} />
+              <Text style={s.optionLabel}>
                 {browserName || '选择浏览器'}
               </Text>
             </View>
-            <View style={styles.optionRight}>
+            <View style={s.optionRight}>
               {browserName ? (
-                <View style={styles.flexRow}>
-                  <Text style={styles.optionValue}>{browserName}</Text>
+                <View style={s.flexRow}>
+                  <Text style={s.optionValue}>{browserName}</Text>
                   <TouchableOpacity
-                    onPress={() => {
-                      setBrowserPackage(undefined);
-                      setBrowserName('');
-                    }}
+                    onPress={() => { setBrowserPackage(undefined); setBrowserName(''); }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="close-circle" size={20} color={COLORS.textTertiary} />
+                    <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
               ) : (
-                <Text style={styles.optionValue}>系统默认</Text>
+                <Text style={s.optionValue}>系统默认</Text>
               )}
-              <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </View>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>安全设置</Text>
-          <View style={styles.optionRow}>
-            <View style={styles.optionLeft}>
-              <Ionicons name="lock-closed" size={22} color={COLORS.warning} />
-              <Text style={styles.optionLabel}>访问密码</Text>
+        {/* 安全设置 */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>安全设置</Text>
+          <View style={s.optionRow}>
+            <View style={s.optionLeft}>
+              <Ionicons name="lock-closed" size={22} color={colors.warning} />
+              <Text style={s.optionLabel}>访问密码</Text>
             </View>
-            <View style={styles.optionRight}>
+            <View style={s.optionRight}>
               {showPassword ? (
                 <TextInput
-                  style={styles.passwordInput}
+                  style={s.passwordInput}
                   placeholder="设置密码"
-                  placeholderTextColor={COLORS.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
@@ -232,33 +274,28 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
                 />
               ) : (
                 <TouchableOpacity onPress={() => setShowPassword(true)}>
-                  <Text style={styles.optionValue}>
-                    {password ? '已设置' : '未设置'}
-                  </Text>
+                  <Text style={s.optionValue}>{password ? '已设置' : '未设置'}</Text>
                 </TouchableOpacity>
               )}
               {password ? (
                 <TouchableOpacity
-                  onPress={() => {
-                    setPassword('');
-                    setShowPassword(false);
-                  }}
+                  onPress={() => { setPassword(''); setShowPassword(false); }}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons name="close-circle" size={20} color={COLORS.error} />
+                  <Ionicons name="close-circle" size={20} color={colors.error} />
                 </TouchableOpacity>
               ) : null}
             </View>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <TouchableOpacity style={s.submitButton} onPress={handleSubmit}>
           <Ionicons
-            name={submitLabel.includes('添加') ? 'add-circle' : 'checkmark-circle'}
+            name={submitLabel.includes('添加') || submitLabel.includes('创建') ? 'add-circle' : 'checkmark-circle'}
             size={22}
-            color={COLORS.textInverse}
+            color={colors.textInverse}
           />
-          <Text style={styles.submitText}>{submitLabel}</Text>
+          <Text style={s.submitText}>{submitLabel}</Text>
         </TouchableOpacity>
 
         <View style={{ height: SPACING.xxxl * 2 }} />
@@ -274,181 +311,142 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    padding: SPACING.lg,
-  },
-  section: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.sm,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
-  },
-  label: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-    marginTop: SPACING.md,
-  },
-  input: {
-    height: 48,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textPrimary,
-    backgroundColor: COLORS.background,
-  },
-  inputError: {
-    borderColor: COLORS.error,
-  },
-  errorText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.error,
-    marginTop: SPACING.xs,
-  },
-  iconTypeRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  iconTypeChip: {
-    flex: 1,
-    height: 36,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconTypeChipActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-  },
-  iconTypeText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-  },
-  iconTypeTextActive: {
-    color: COLORS.primary,
-  },
-  emojiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  emojiItem: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.background,
-  },
-  emojiItemActive: {
-    backgroundColor: COLORS.primaryLight,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  emojiText: {
-    fontSize: 24,
-  },
-  previewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.md,
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  previewIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewIconText: {
-    backgroundColor: COLORS.primary,
-  },
-  previewText: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.textInverse,
-  },
-  previewLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    flex: 1,
-  },
-  optionLabel: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textPrimary,
-  },
-  optionRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  optionValue: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-  },
-  flexRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  passwordInput: {
-    height: 36,
-    width: 100,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.sm,
-    paddingHorizontal: SPACING.sm,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textPrimary,
-  },
-  submitButton: {
-    height: 52,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    ...SHADOWS.md,
-  },
-  submitText: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.textInverse,
-  },
-});
+function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    container: { flex: 1, backgroundColor: colors.background, padding: SPACING.lg },
+    section: {
+      backgroundColor: colors.surface,
+      borderRadius: BORDER_RADIUS.lg,
+      padding: SPACING.lg,
+      marginBottom: SPACING.lg,
+      ...SHADOWS.sm,
+    },
+    sectionTitle: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: SPACING.md,
+    },
+    label: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      marginBottom: SPACING.xs,
+      marginTop: SPACING.md,
+    },
+    input: {
+      height: 48,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: BORDER_RADIUS.md,
+      paddingHorizontal: SPACING.md,
+      fontSize: FONT_SIZE.md,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    inputError: { borderColor: colors.error },
+    errorText: { fontSize: FONT_SIZE.xs, color: colors.error, marginTop: SPACING.xs },
+    categorySuggestions: { marginTop: SPACING.sm, maxHeight: 36 },
+    categorySuggestionsContent: { gap: SPACING.sm },
+    categorySuggestion: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: BORDER_RADIUS.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    categorySuggestionActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    categorySuggestionText: {
+      fontSize: FONT_SIZE.sm,
+      color: colors.textSecondary,
+    },
+    categorySuggestionTextActive: { color: colors.primary },
+    iconTypeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+    iconTypeChip: {
+      flex: 1,
+      height: 36,
+      borderRadius: BORDER_RADIUS.full,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconTypeChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    iconTypeText: { fontSize: FONT_SIZE.sm, fontWeight: '500', color: colors.textSecondary },
+    iconTypeTextActive: { color: colors.primary },
+    emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+    emojiItem: {
+      width: 44,
+      height: 44,
+      borderRadius: BORDER_RADIUS.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+    emojiItemActive: {
+      backgroundColor: colors.primaryLight,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    emojiText: { fontSize: 24 },
+    previewContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      padding: SPACING.md,
+      backgroundColor: colors.background,
+      borderRadius: BORDER_RADIUS.md,
+    },
+    previewIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: BORDER_RADIUS.md,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    previewIconText: { backgroundColor: colors.primary },
+    previewText: { fontSize: FONT_SIZE.xl, fontWeight: '700', color: colors.textInverse },
+    previewLabel: { fontSize: FONT_SIZE.sm, color: colors.textSecondary },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: SPACING.md,
+    },
+    optionLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, flex: 1 },
+    optionLabel: { fontSize: FONT_SIZE.md, color: colors.textPrimary },
+    optionRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+    optionValue: { fontSize: FONT_SIZE.sm, color: colors.textSecondary },
+    flexRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+    passwordInput: {
+      height: 36,
+      width: 100,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: BORDER_RADIUS.sm,
+      paddingHorizontal: SPACING.sm,
+      fontSize: FONT_SIZE.sm,
+      color: colors.textPrimary,
+    },
+    submitButton: {
+      height: 52,
+      borderRadius: BORDER_RADIUS.lg,
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      ...SHADOWS.md,
+    },
+    submitText: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: colors.textInverse },
+  });
+}
