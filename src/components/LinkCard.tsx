@@ -64,13 +64,10 @@ export function LinkCard({ link, onPress, onLongPress }: LinkCardProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: '30%',
-    aspectRatio: 0.85,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
     ...SHADOWS.sm,
   },
   iconContainer: {

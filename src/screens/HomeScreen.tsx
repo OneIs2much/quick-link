@@ -29,8 +29,10 @@ interface Props {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const GRID_SPACING = SCREEN_WIDTH * 0.025;
-const CARD_WIDTH = (SCREEN_WIDTH - SPACING.lg * 2 - GRID_SPACING * 2) / 3;
+const GRID_PADDING = SPACING.lg;
+const COLUMN_GAP = SPACING.md;
+// 三列均分：总宽 - 两侧 padding - 两个列间距，再除以 3
+const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - COLUMN_GAP * 2) / 3;
 
 const ALL_CATEGORY = '__all__';
 
@@ -125,7 +127,7 @@ export function HomeScreen({ navigation, route }: Props) {
   const s = makeStyles(colors);
 
   const renderLinkItem = ({ item }: { item: QuickLink }) => (
-    <View style={[s.cardWrapper, { width: CARD_WIDTH }]}>
+    <View style={s.cardWrapper}>
       <LinkCard
         link={item}
         onPress={handleLinkPress}
@@ -343,9 +345,9 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
       color: colors.textTertiary,
       fontWeight: '500',
     },
-    listContent: { paddingHorizontal: SPACING.lg, paddingBottom: 100 },
-    columnWrapper: { gap: GRID_SPACING, justifyContent: 'flex-start' },
-    cardWrapper: { marginBottom: SPACING.sm },
+    listContent: { paddingHorizontal: GRID_PADDING, paddingBottom: 100 },
+    columnWrapper: { gap: COLUMN_GAP },
+    cardWrapper: { width: CARD_WIDTH, marginBottom: SPACING.md },
     fab: {
       position: 'absolute',
       right: SPACING.xl,
