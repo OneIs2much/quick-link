@@ -1,10 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { useTheme } from '../contexts/ThemeContext';
 import { QuickLink } from '../types';
-import { getInitials } from '../utils/validators';
 
 interface LinkCardProps {
   link: QuickLink;
@@ -14,26 +13,9 @@ interface LinkCardProps {
 
 export function LinkCard({ link, onPress, onLongPress }: LinkCardProps) {
   const { colors } = useTheme();
+  const [imgError, setImgError] = useState(false);
 
-  const renderIcon = () => {
-    if (link.iconType === 'emoji') {
-      return <Text style={styles.emojiIcon}>{link.icon}</Text>;
-    }
-    if (link.iconType === 'icon') {
-      return (
-        <Ionicons
-          name={(link.icon as keyof typeof Ionicons.glyphMap) || 'link'}
-          size={28}
-          color={colors.primary}
-        />
-      );
-    }
-    return (
-      <Text style={[styles.textIcon, { color: colors.primary }]}>
-        {getInitials(link.name)}
-      </Text>
-    );
-  };
+  const showFallback = !link.icon || imgError;
 
   return (
     <TouchableOpacity
@@ -44,7 +26,15 @@ export function LinkCard({ link, onPress, onLongPress }: LinkCardProps) {
       delayLongPress={400}
     >
       <View style={[styles.iconContainer, { backgroundColor: colors.primaryLight }]}>
-        {renderIcon()}
+        {showFallback ? (
+          <Ionicons name="link" size={28} color={colors.primary} />
+        ) : (
+          <Image
+            source={{ uri: link.icon }}
+            style={styles.iconImage}
+            onError={() => setImgError(true)}
+          />
+        )}
         {link.password ? (
           <View style={[styles.lockBadge, { borderColor: colors.surface }]}>
             <Ionicons name="lock-closed" size={10} color={colors.textInverse} />
@@ -78,8 +68,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: SPACING.sm,
   },
-  emojiIcon: { fontSize: 30 },
-  textIcon: { fontSize: FONT_SIZE.lg, fontWeight: '700' },
+  iconImage: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.sm,
+  },
   lockBadge: {
     position: 'absolute',
     top: -4,

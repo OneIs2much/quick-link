@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING, FONT_SIZE, BORDER_RADIUS, SHADOWS } from '../constants/theme';
-import { DEFAULT_ICONS, ICON_OPTIONS } from '../constants/browsers';
 import { BrowserPicker } from './BrowserPicker';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLinks } from '../contexts/LinkContext';
 import { QuickLink, BrowserInfo } from '../types';
+import { getFaviconUrl } from '../services/faviconService';
+import { fetchPageTitle } from '../services/pageTitleService';
 
 interface LinkFormProps {
   initialValues?: Partial<QuickLink>;
@@ -29,9 +33,12 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
 
   const [name, setName] = useState(initialValues?.name || '');
   const [url, setUrl] = useState(initialValues?.url || '');
-  const [icon, setIcon] = useState(initialValues?.icon || DEFAULT_ICONS[0]);
-  const [iconType, setIconType] = useState<'emoji' | 'icon' | 'text'>(
-    initialValues?.iconType || 'emoji',
+  const [icon, setIcon] = useState(initialValues?.icon || '');
+  const [iconType, setIconType] = useState<'favicon' | 'custom'>(
+    // 旧数据 iconType 为 emoji/icon/text 时，降级为 favicon
+    (initialValues?.iconType === 'favicon' || initialValues?.iconType === 'custom')
+      ? initialValues.iconType
+      : 'favicon',
   );
   const [browserPackage, setBrowserPackage] = useState(initialValues?.browserPackage);
   const [browserName, setBrowserName] = useState('');
@@ -40,8 +47,56 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
   const [showBrowserPicker, setShowBrowserPicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; url?: string }>({});
+  const [suggestedName, setSuggestedName] = useState<string | undefined>();
+  const [fetchingTitle, setFetchingTitle] = useState(false);
 
   const existingCategories = getCategories();
+
+  // URL 变化时自动更新 favicon（仅 favicon 模式）
+  useEffect(() => {
+    if (iconType !== 'favicon') return;
+    const faviconUrl = getFaviconUrl(url);
+    setIcon(faviconUrl || '');
+  }, [url, iconType]);
+
+  const handleIconTypeChange = (type: 'favicon' | 'custom') => {
+    setIconType(type);
+    if (type === 'favicon') {
+      setIcon(getFaviconUrl(url) || '');
+    } else {
+      // 切换到自定义时清空，等用户选图
+      setIcon('');
+    }
+  };
+
+  const handleUrlBlur = async () => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    setFetchingTitle(true);
+    const title = await fetchPageTitle(trimmed);
+    setFetchingTitle(false);
+    if (!title) return;
+    const capped = title.slice(0, 20);
+    if (!name.trim()) {
+      setName(capped);
+    } else {
+      setSuggestedName(capped);
+    }
+  };
+
+  const handlePickImage = async () => {    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+      base64: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setIcon(result.assets[0].uri);
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: { name?: string; url?: string } = {};
@@ -87,74 +142,95 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
         {/* 图标选择 */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>图标</Text>
+
+          {/* 模式切换 */}
           <View style={s.iconTypeRow}>
-            {ICON_OPTIONS.map(opt => (
+            {([
+              { type: 'favicon', label: '自动抓取' },
+              { type: 'custom', label: '自定义图片' },
+            ] as const).map(opt => (
               <TouchableOpacity
                 key={opt.type}
                 style={[s.iconTypeChip, iconType === opt.type && s.iconTypeChipActive]}
-                onPress={() => {
-                  setIconType(opt.type);
-                  if (opt.type === 'emoji') setIcon(DEFAULT_ICONS[0]);
-                  else if (opt.type === 'icon') setIcon('link');
-                  else setIcon('');
-                }}
+                onPress={() => handleIconTypeChange(opt.type)}
               >
-                <Text
-                  style={[
-                    s.iconTypeText,
-                    iconType === opt.type && s.iconTypeTextActive,
-                  ]}
-                >
+                <Text style={[s.iconTypeText, iconType === opt.type && s.iconTypeTextActive]}>
                   {opt.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {iconType === 'emoji' && (
-            <View style={s.emojiGrid}>
-              {DEFAULT_ICONS.map(emoji => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[s.emojiItem, icon === emoji && s.emojiItemActive]}
-                  onPress={() => setIcon(emoji)}
-                >
-                  <Text style={s.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
+          {/* 预览 + 操作 */}
+          <View style={s.iconPreviewRow}>
+            <View style={[s.iconPreviewBox, { backgroundColor: colors.primaryLight }]}>
+              {icon ? (
+                <Image source={{ uri: icon }} style={s.iconPreviewImage} />
+              ) : (
+                <Ionicons name="link" size={32} color={colors.primary} />
+              )}
             </View>
-          )}
 
-          {iconType === 'icon' && (
-            <View style={s.previewContainer}>
-              <View style={s.previewIcon}>
-                <Ionicons
-                  name={(icon as keyof typeof Ionicons.glyphMap) || 'link'}
-                  size={32}
-                  color={colors.primary}
-                />
-              </View>
-              <Text style={s.previewLabel}>图标: {icon || 'link'}</Text>
-            </View>
-          )}
-
-          {iconType === 'text' && (
-            <View style={s.previewContainer}>
-              <View style={[s.previewIcon, s.previewIconText]}>
-                <Text style={s.previewText}>
-                  {name ? name.charAt(0).toUpperCase() : 'A'}
+            <View style={s.iconPreviewInfo}>
+              {iconType === 'favicon' ? (
+                <Text style={[s.iconHint, { color: colors.textSecondary }]}>
+                  {icon ? '已自动抓取站点图标' : '填写链接地址后自动获取'}
                 </Text>
-              </View>
-              <Text style={s.previewLabel}>将取名称首字符作为图标</Text>
+              ) : (
+                <TouchableOpacity style={[s.pickButton, { backgroundColor: colors.primary }]} onPress={handlePickImage}>
+                  <Ionicons name="image-outline" size={18} color={colors.textInverse} />
+                  <Text style={[s.pickButtonText, { color: colors.textInverse }]}>
+                    {icon ? '重新选择' : '选择图片'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={[s.iconHintSub, { color: colors.textTertiary }]}>
+                {iconType === 'favicon'
+                  ? '无法获取时显示默认图标'
+                  : '将自动裁剪为 1:1 正方形'}
+              </Text>
             </View>
-          )}
+          </View>
         </View>
 
         {/* 基本信息 */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>基本信息</Text>
 
-          <Text style={s.label}>链接名称</Text>
+          <View style={s.labelRow}>
+            <Text style={[s.label, s.labelInRow]}>链接地址 (URL)</Text>
+            <Text style={[s.required, { color: colors.error }]}>*</Text>
+          </View>
+          <View style={s.urlRow}>
+            <TextInput
+              style={[s.input, s.urlInput, errors.url ? s.inputError : null]}
+              placeholder="例如：https://example.com"
+              placeholderTextColor={colors.textTertiary}
+              value={url}
+              onChangeText={text => {
+                setUrl(text);
+                setSuggestedName(undefined);
+                if (errors.url) setErrors(prev => ({ ...prev, url: undefined }));
+              }}
+              onBlur={handleUrlBlur}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {fetchingTitle ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                style={s.urlLoader}
+              />
+            ) : null}
+          </View>
+          {errors.url ? <Text style={s.errorText}>{errors.url}</Text> : null}
+
+          <View style={s.labelRow}>
+            <Text style={[s.label, s.labelInRow]}>链接名称</Text>
+            <Text style={[s.required, { color: colors.error }]}>*</Text>
+          </View>
           <TextInput
             style={[s.input, errors.name ? s.inputError : null]}
             placeholder="例如：我的博客"
@@ -166,23 +242,26 @@ export function LinkForm({ initialValues, onSubmit, submitLabel }: LinkFormProps
             }}
             maxLength={20}
           />
+          {suggestedName ? (
+            <View style={[s.suggestionBar, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}>
+              <Text style={[s.suggestionText, { color: colors.textSecondary }]} numberOfLines={1}>
+                建议名称：{suggestedName}
+              </Text>
+              <TouchableOpacity
+                onPress={() => { setName(suggestedName); setSuggestedName(undefined); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[s.suggestionUse, { color: colors.primary }]}>使用</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setSuggestedName(undefined)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
           {errors.name ? <Text style={s.errorText}>{errors.name}</Text> : null}
-
-          <Text style={s.label}>链接地址 (URL)</Text>
-          <TextInput
-            style={[s.input, errors.url ? s.inputError : null]}
-            placeholder="例如：https://example.com"
-            placeholderTextColor={colors.textTertiary}
-            value={url}
-            onChangeText={text => {
-              setUrl(text);
-              if (errors.url) setErrors(prev => ({ ...prev, url: undefined }));
-            }}
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {errors.url ? <Text style={s.errorText}>{errors.url}</Text> : null}
 
           <Text style={s.label}>分类（可选）</Text>
           <TextInput
@@ -335,6 +414,22 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
       marginBottom: SPACING.xs,
       marginTop: SPACING.md,
     },
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      marginBottom: SPACING.xs,
+      marginTop: SPACING.md,
+    },
+    labelInRow: {
+      marginBottom: 0,
+      marginTop: 0,
+    },
+    required: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '700',
+      lineHeight: 18,
+    },
     input: {
       height: 48,
       borderWidth: 1.5,
@@ -382,22 +477,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
     },
     iconTypeText: { fontSize: FONT_SIZE.sm, fontWeight: '500', color: colors.textSecondary },
     iconTypeTextActive: { color: colors.primary },
-    emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-    emojiItem: {
-      width: 44,
-      height: 44,
-      borderRadius: BORDER_RADIUS.sm,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-    },
-    emojiItemActive: {
-      backgroundColor: colors.primaryLight,
-      borderWidth: 2,
-      borderColor: colors.primary,
-    },
-    emojiText: { fontSize: 24 },
-    previewContainer: {
+    iconPreviewRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.md,
@@ -405,17 +485,35 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
       backgroundColor: colors.background,
       borderRadius: BORDER_RADIUS.md,
     },
-    previewIcon: {
-      width: 52,
-      height: 52,
-      borderRadius: BORDER_RADIUS.md,
-      backgroundColor: colors.primaryLight,
+    iconPreviewBox: {
+      width: 64,
+      height: 64,
+      borderRadius: BORDER_RADIUS.lg,
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
     },
-    previewIconText: { backgroundColor: colors.primary },
-    previewText: { fontSize: FONT_SIZE.xl, fontWeight: '700', color: colors.textInverse },
-    previewLabel: { fontSize: FONT_SIZE.sm, color: colors.textSecondary },
+    iconPreviewImage: {
+      width: 40,
+      height: 40,
+      borderRadius: BORDER_RADIUS.sm,
+    },
+    iconPreviewInfo: {
+      flex: 1,
+      gap: SPACING.xs,
+    },
+    iconHint: { fontSize: FONT_SIZE.sm },
+    iconHintSub: { fontSize: FONT_SIZE.xs },
+    pickButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: BORDER_RADIUS.md,
+      alignSelf: 'flex-start',
+    },
+    pickButtonText: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
     optionRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -448,5 +546,20 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
       ...SHADOWS.md,
     },
     submitText: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: colors.textInverse },
+    urlRow: { flexDirection: 'row', alignItems: 'center' },
+    urlInput: { flex: 1 },
+    urlLoader: { marginLeft: SPACING.sm },
+    suggestionBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      marginTop: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: BORDER_RADIUS.sm,
+      borderWidth: 1,
+    },
+    suggestionText: { flex: 1, fontSize: FONT_SIZE.xs },
+    suggestionUse: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
   });
 }

@@ -63,15 +63,3 @@ export const BROWSERS: BrowserInfo[] = [
   },
 ];
 
-export const DEFAULT_ICONS = [
-  '🔗', '🌐', '📱', '💬', '📧', '📰', '🎬', '🎵',
-  '📚', '🛒', '🗺️', '📅', '💼', '🏠', '⭐', '❤️',
-  '🔥', '💡', '🎮', '📷', '✈️', '🍕', '☕', '🎓',
-  '💻', '📊', '🏃', '🎯', '💰', '🔧', '📝', '🤖',
-];
-
-export const ICON_OPTIONS = [
-  { type: 'emoji' as const, label: '表情符号' },
-  { type: 'icon' as const, label: '图标' },
-  { type: 'text' as const, label: '文字' },
-];

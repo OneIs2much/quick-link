@@ -5,9 +5,14 @@ export interface QuickLink {
   id: string;
   name: string;
   url: string;
-  /** 图标内容：emoji 字符 / Ionicons 图标名 / 文字首字母 */
+  /**
+   * 图标内容：
+   * - favicon: Google Favicon API URL（由 faviconService 生成）
+   * - custom:  expo-image-picker 返回的本地 URI（base64 data URI 或 file://）
+   */
   icon: string;
-  iconType: 'emoji' | 'icon' | 'text';
+  /** favicon = 自动抓取站点图标；custom = 用户上传的自定义图片 */
+  iconType: 'favicon' | 'custom';
   /** 指定打开的浏览器包名，undefined 表示使用全局默认 */
   browserPackage?: string;
   /** 访问密码，undefined 表示无密码保护 */
