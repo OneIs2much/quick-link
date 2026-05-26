@@ -1,0 +1,7 @@
+{
+  "name": "shortcut-manager",
+  "version": "1.0.0",
+  "description": "Local Expo module for Android Pinned Shortcuts",
+  "main": "index.ts",
+  "private": true
+}

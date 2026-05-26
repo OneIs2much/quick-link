@@ -116,7 +116,7 @@ export function HomeScreen({ navigation, route }: Props) {
     if (result === 'success') {
       toast.success('已发起添加请求，请在系统对话框中确认');
     } else if (result === 'unsupported') {
-      toast.error('当前设备不支持添加到桌面（需要 Android 8.0+）');
+      toast.error('添加到桌面需要 Android 8.0+ 且使用完整构建版本（非 Expo Go）');
     } else {
       toast.error('添加到桌面失败，请重试');
     }

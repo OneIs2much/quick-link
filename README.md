@@ -22,7 +22,7 @@ Android 端快捷链接管理应用。创建自定义链接卡片，一键跳转
 | Expo SDK | 55 | 工具链和服务平台 |
 | TypeScript | 5.9 | 类型安全 |
 | React Navigation | 7 | 导航和路由 |
-| AsyncStorage | 3 | 本地持久化存储 |
+| AsyncStorage | 1.24 | 本地持久化存储 |
 | expo-haptics | 55 | 触觉反馈（Android & iOS） |
 | expo-sharing | 55 | 数据导出分享 |
 | expo-document-picker | 55 | 数据导入文件选择 |
@@ -37,10 +37,13 @@ quick-link/
 ├── app.json                         # Expo 配置（deep link scheme: quicklink://）
 ├── modules/
 │   └── shortcut-manager/            # 本地 native module（Android Pinned Shortcut）
+│       ├── package.json
 │       ├── expo-module.config.json
 │       ├── index.ts                 # JS 导出层
-│       └── src/
-│           └── ShortcutManagerModule.kt
+│       └── android/
+│           ├── build.gradle
+│           └── src/main/java/expo/modules/shortcutmanager/
+│               └── ShortcutManagerModule.kt
 └── src/
     ├── components/
     │   ├── BrowserPicker.tsx        # 浏览器选择底部弹窗
@@ -107,7 +110,9 @@ npx expo run:android
 > **为什么不能用 Expo Go？**
 > Expo Go 是预编译的沙盒应用，不包含自定义 native module。
 > `modules/shortcut-manager/` 中的 Kotlin 代码需要编译进 APK 才能运行。
-> 在未 prebuild 的环境中，`isPinShortcutSupported()` 会返回 false，"添加到桌面"按钮不显示，应用其余功能正常。
+> 在未 prebuild 的环境中，"添加到桌面"选项仍会显示，但点击后会提示不支持，其余功能不受影响。
+
+> **修改了 native module 后需要重新 prebuild。** 只修改 JS/TS 代码时无需重新 prebuild，Metro 热更新即可生效。
 
 ### 类型检查
 

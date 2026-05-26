@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { requestPinShortcut, isPinShortcutSupported } from '../../modules/shortcut-manager';
+import { requestPinShortcut } from '../../modules/shortcut-manager';
 import { ShortcutResult } from '../types';
 
 /**
@@ -30,10 +30,12 @@ export async function addLinkToHomeScreen(
 }
 
 /**
- * 检查当前设备是否支持将链接添加到桌面。
- * 可用于决定是否在 UI 中显示"添加到桌面"按钮。
+ * 是否在 UI 中显示"添加到桌面"入口。
+ *
+ * 只要是 Android 平台就显示，不在此处检查 native module 是否已加载。
+ * 实际能力检查在 addLinkToHomeScreen 执行时进行，不支持时会返回 'unsupported'。
+ * 这样用户能看到入口，点击后若设备不支持会收到明确提示，而非选项直接消失。
  */
 export function canAddToHomeScreen(): boolean {
-  if (Platform.OS !== 'android') return false;
-  return isPinShortcutSupported();
+  return Platform.OS === 'android';
 }
